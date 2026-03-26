@@ -1,0 +1,9 @@
+nfstream
+pandas
+joblib
+scikit-learn
+numpy
+streamlit
+shap
+plotly
+openai
