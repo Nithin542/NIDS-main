@@ -1,7 +1,10 @@
 import streamlit as st
-import sqlite3
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 import pandas as pd
 import json
+
+load_dotenv()
 import joblib
 import shap
 import plotly.graph_objects as go
@@ -103,14 +106,24 @@ def load_model():
         return False, str(e)
 
 def get_live_data(limit=500):
-    if not os.path.exists(DB_PATH):
-        return pd.DataFrame()
     try:
-        conn = sqlite3.connect(DB_PATH)
-        df   = pd.read_sql_query(f"SELECT * FROM logs ORDER BY timestamp DESC LIMIT {limit}", conn)
-        conn.close()
+        db_url = os.environ.get("DATABASE_URL")
+        # Fallback to st.secrets if available (Streamlit Cloud uses this)
+        if not db_url:
+            try:
+                db_url = st.secrets["DATABASE_URL"]
+            except (KeyError, FileNotFoundError):
+                db_url = f"sqlite:///{os.path.join(BASE_DIR, 'nids.db')}"
+                
+        # SQLAlchemy requires 'postgresql://' instead of 'postgres://'
+        if db_url.startswith("postgres://"):
+             db_url = db_url.replace("postgres://", "postgresql://", 1)
+             
+        engine = create_engine(db_url)
+        df = pd.read_sql_query(f"SELECT * FROM logs ORDER BY timestamp DESC LIMIT {limit}", engine)
         return df
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching live data: {e}")
         return pd.DataFrame()
 
 def metric_card(label, value, css_class):

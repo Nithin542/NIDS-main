@@ -8,3 +8,6 @@ altair<5
 shap
 plotly
 openai
+psycopg2-binary
+SQLAlchemy
+python-dotenv

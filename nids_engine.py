@@ -1,12 +1,16 @@
 import os
 import pandas as pd
 import joblib
-import sqlite3
+from sqlalchemy import create_engine, Table, Column, Integer, String, Float, MetaData
+from sqlalchemy.sql import text
+from dotenv import load_dotenv
 import numpy as np
 import json
 from nfstream import NFStreamer
 from datetime import datetime
 import warnings
+
+load_dotenv()
 
 warnings.filterwarnings("ignore")
 
@@ -29,47 +33,52 @@ except Exception as e:
 # Database Setup (macOS Safe)
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "nids.db")
 
 def init_db():
     try:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                src_ip TEXT,
-                dst_ip TEXT,
-                attack_type TEXT,
-                confidence REAL,
-                features_json TEXT
-            )
-        """)
-        try:
-            cursor.execute("ALTER TABLE logs ADD COLUMN features_json TEXT;")
-        except sqlite3.OperationalError:
-            pass
-        conn.commit()
-        print("✅ Database initialized.")
-        return conn
+        db_url = os.environ.get("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'nids.db')}")
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+        engine = create_engine(db_url)
+        metadata = MetaData()
+        
+        logs = Table('logs', metadata,
+            Column('id', Integer, primary_key=True, autoincrement=True),
+            Column('timestamp', String),
+            Column('src_ip', String),
+            Column('dst_ip', String),
+            Column('attack_type', String),
+            Column('confidence', Float),
+            Column('features_json', String)
+        )
+        
+        metadata.create_all(engine)
+        print("✅ Database initialized (SQLAlchemy/Neon).")
+        return engine
     except Exception as e:
         print(f"❌ Database Error: {e}")
         return None
 
-db_conn = init_db()
+db_engine = init_db()
 
-def save_log_entry(conn, data):
-    if conn is None:
+def save_log_entry(engine, data):
+    if engine is None:
         return
     try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO logs (timestamp, src_ip, dst_ip, attack_type, confidence, features_json) VALUES (?, ?, ?, ?, ?, ?)",
-            (data['timestamp'], data['src_ip'], data['dst_ip'], data['attack_type'], data['confidence'], data['features_json'])
-        )
-        conn.commit()
+        with engine.begin() as conn:
+            query = text("""
+                INSERT INTO logs (timestamp, src_ip, dst_ip, attack_type, confidence, features_json)
+                VALUES (:timestamp, :src_ip, :dst_ip, :attack_type, :confidence, :features_json)
+            """)
+            conn.execute(query, {
+                'timestamp': data['timestamp'],
+                'src_ip': data['src_ip'],
+                'dst_ip': data['dst_ip'],
+                'attack_type': data['attack_type'],
+                'confidence': data['confidence'],
+                'features_json': data['features_json']
+            })
     except Exception as e:
         print(f"DB Insert Error: {e}")
 
@@ -192,8 +201,7 @@ for flow in streamer:
             'confidence': float(confidence),
             'features_json': json.dumps(X_scaled.tolist()[0])
         }
-
-        save_log_entry(db_conn, log_entry)
+        save_log_entry(db_engine, log_entry)
 
         # Console Output
         icon = "🟢" if label == "Normal Traffic" else "⚠️"
