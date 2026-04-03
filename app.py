@@ -109,23 +109,27 @@ def load_model():
 def get_live_data(limit=500):
     try:
         db_url = os.environ.get("DATABASE_URL")
-        # Fallback to st.secrets if available (Streamlit Cloud uses this)
         if not db_url:
             try:
                 db_url = st.secrets["DATABASE_URL"]
             except (KeyError, FileNotFoundError):
                 db_url = f"sqlite:///{os.path.join(BASE_DIR, 'nids.db')}"
                 
-        # SQLAlchemy requires 'postgresql://' instead of 'postgres://'
         if db_url.startswith("postgres://"):
              db_url = db_url.replace("postgres://", "postgresql://", 1)
              
         engine = create_engine(db_url)
         df = pd.read_sql_query(f"SELECT * FROM logs ORDER BY timestamp DESC LIMIT {limit}", engine)
-        return df
+        
+        # Get true total counts (so it isn't capped at 500)
+        with engine.begin() as conn:
+            true_total = conn.execute(text("SELECT COUNT(*) FROM logs")).scalar()
+            true_attacks = conn.execute(text("SELECT COUNT(*) FROM logs WHERE attack_type != 'Normal Traffic'")).scalar()
+            
+        return df, true_total, true_attacks
     except Exception as e:
         print(f"Error fetching live data: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(), 0, 0
 
 def metric_card(label, value, css_class):
     st.markdown(
@@ -317,13 +321,13 @@ elif st.session_state.mode == 'live':
             except Exception as e:
                 st.error(f"Failed to clear logs: {e}")
 
-    df = get_live_data()
+    df, true_total, true_attacks = get_live_data()
 
-    if df.empty:
-        st.info("No traffic logs yet. Make sure the NIDS engine is running with sudo.")
+    if df.empty and true_total == 0:
+        st.info("No traffic logs yet. Make sure the NIDS engine is running.")
     else:
-        total_flows = len(df)
-        attacks     = int((df['attack_type'] != 'Normal Traffic').sum())
+        total_flows = true_total
+        attacks     = true_attacks
         normals     = total_flows - attacks
         atk_pct     = attacks / total_flows * 100 if total_flows else 0
 
