@@ -140,17 +140,32 @@ MAPS = {
 }
 
 # ==============================
-# NFStreamer Setup (macOS)
+# NFStreamer Setup (Cross-Platform)
 # ==============================
-print("Starting NFStreamer... (Requires sudo)")
+import platform
+import sys
 
-streamer = NFStreamer(
-    source="en0",   # macOS WiFi interface
-    statistical_analysis=True,
-    idle_timeout=1,
-    active_timeout=1,
-    promiscuous_mode=True
-)
+# Auto-detect the right network interface depending on if we are running locally or on the cloud server
+if platform.system() == "Darwin":
+    network_interface = "en0"  # macOS WiFi
+elif platform.system() == "Linux":
+    network_interface = "ens5" # AWS EC2 Default
+else:
+    network_interface = "eth0" # Fallback
+
+print(f"Starting NFStreamer on interface '{network_interface}'... (Requires sudo)")
+
+try:
+    streamer = NFStreamer(
+        source=network_interface,
+        statistical_analysis=True,
+        idle_timeout=1,
+        active_timeout=1,
+        promiscuous_mode=True
+    )
+except Exception as e:
+    print(f"❌ Failed to attach scanner to {network_interface}: {e}")
+    sys.exit(1)
 
 print("🛡️ NetShield NIDS Engine is LIVE...")
 
