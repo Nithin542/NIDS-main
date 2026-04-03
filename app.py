@@ -163,6 +163,85 @@ section[data-testid="stSidebar"] .stMarkdown h3 {
 }
 .section-header h3 { margin: 0; font-weight: 700; color: #e2e8f0; font-size: 1.15rem; }
 
+/* ---- Animated Floating Particles (Home Page) ---- */
+@keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; }
+    50% { transform: translateY(-20px) rotate(180deg); opacity: 0.6; }
+}
+.particles {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 50%;
+    animation: float 6s ease-in-out infinite;
+}
+.particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 8s; }
+.particle:nth-child(2) { left: 25%; top: 60%; animation-delay: 1s; animation-duration: 6s; }
+.particle:nth-child(3) { left: 50%; top: 30%; animation-delay: 2s; animation-duration: 7s; }
+.particle:nth-child(4) { left: 70%; top: 70%; animation-delay: 0.5s; animation-duration: 9s; }
+.particle:nth-child(5) { left: 85%; top: 15%; animation-delay: 1.5s; animation-duration: 5s; }
+.particle:nth-child(6) { left: 40%; top: 85%; animation-delay: 3s; animation-duration: 10s; }
+.particle:nth-child(7) { left: 60%; top: 45%; animation-delay: 2.5s; animation-duration: 7.5s; }
+.particle:nth-child(8) { left: 15%; top: 90%; animation-delay: 4s; animation-duration: 6.5s; }
+
+/* ---- Threat Level Indicator ---- */
+.threat-gauge {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+}
+.gauge-bar-bg {
+    width: 100%;
+    height: 10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 12px 0 8px 0;
+}
+.gauge-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gauge-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    color: #94a3b8;
+}
+.gauge-level {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-top: 4px;
+}
+
+/* ---- Animated Counter ---- */
+@keyframes countUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.kpi-value { animation: countUp 0.6s ease-out; }
+
+/* ---- Glow Effect on Attack Detection ---- */
+@keyframes dangerGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(248,113,113,0.1); }
+    50% { box-shadow: 0 0 20px rgba(248,113,113,0.3), 0 0 40px rgba(248,113,113,0.1); }
+}
+.kpi-card.danger:has(.kpi-value:not(:empty)) {
+    animation: dangerGlow 3s ease-in-out infinite;
+}
+
 /* ---- Hero Banner ---- */
 .hero {
     text-align: center;
@@ -480,6 +559,16 @@ with st.sidebar:
 # HOME — HERO + MODE SELECTOR
 # ======================================================
 if st.session_state.mode == 'home':
+    # Animated floating particles
+    st.markdown("""
+    <div class="particles">
+        <div class="particle"></div><div class="particle"></div>
+        <div class="particle"></div><div class="particle"></div>
+        <div class="particle"></div><div class="particle"></div>
+        <div class="particle"></div><div class="particle"></div>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("""
     <div class="hero">
         <div class="hero-title">NetShield NIDS</div>
@@ -621,6 +710,97 @@ elif st.session_state.mode == 'live':
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # ---- Threat Level Gauge + Donut Chart Row ----
+        gauge_col, donut_col = st.columns([1, 1])
+
+        with gauge_col:
+            # Dynamic Threat Level Gauge
+            if atk_pct == 0:
+                level, level_color, level_text = 'LOW', '#34d399', 'All Clear'
+            elif atk_pct < 5:
+                level, level_color, level_text = 'MODERATE', '#fbbf24', 'Elevated Activity'
+            elif atk_pct < 20:
+                level, level_color, level_text = 'HIGH', '#fb923c', 'Active Threats'
+            else:
+                level, level_color, level_text = 'CRITICAL', '#f87171', 'Under Attack'
+
+            bar_width = max(atk_pct, 2)  # minimum visual width
+            st.markdown(f"""
+            <div class="threat-gauge">
+                <div class="gauge-label">Threat Level</div>
+                <div class="gauge-level" style="color:{level_color};">{level}</div>
+                <div class="gauge-bar-bg">
+                    <div class="gauge-bar-fill" style="width:{min(bar_width, 100)}%; background: linear-gradient(90deg, {level_color}, {level_color}88);"></div>
+                </div>
+                <div style="font-size:0.78rem; color:#64748b;">{level_text} — {atk_pct:.1f}% attack rate</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with donut_col:
+            # Attack vs Normal Donut Chart
+            fig_donut = go.Figure(go.Pie(
+                labels=['Normal', 'Malicious'],
+                values=[normals, attacks],
+                hole=0.65,
+                marker=dict(colors=['#34d399', '#f87171'], line=dict(width=0)),
+                textinfo='percent',
+                textfont=dict(size=13, color='#e2e8f0'),
+                hoverinfo='label+value+percent'
+            ))
+            fig_donut.update_layout(
+                height=220,
+                showlegend=True,
+                legend=dict(font=dict(color='#94a3b8', size=11), orientation='h', y=-0.1, x=0.5, xanchor='center'),
+                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=10, b=30, l=10, r=10),
+                annotations=[dict(text=f'<b>{total_flows:,}</b><br><span style="font-size:10px;color:#64748b">Total</span>',
+                                  x=0.5, y=0.5, font=dict(size=18, color='#e2e8f0'), showarrow=False)]
+            )
+            st.plotly_chart(fig_donut, use_container_width=True)
+
+        # ---- Top Talkers (Source IPs) ----
+        if 'src_ip' in df.columns and len(df) > 0:
+            talkers_col, types_col = st.columns(2)
+
+            with talkers_col:
+                st.markdown('<div class="section-header"><h3>🌐 Top Source IPs</h3></div>', unsafe_allow_html=True)
+                top_ips = df['src_ip'].value_counts().head(8).reset_index()
+                top_ips.columns = ['IP', 'Flows']
+                fig_ips = go.Figure(go.Bar(
+                    x=top_ips['Flows'], y=top_ips['IP'], orientation='h',
+                    marker=dict(color='#818cf8', line=dict(width=0)),
+                    text=top_ips['Flows'], textposition='inside'
+                ))
+                fig_ips.update_layout(
+                    height=280,
+                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#94a3b8', family='Inter', size=11),
+                    margin=dict(l=120, r=20, t=10, b=30),
+                    xaxis=dict(gridcolor='rgba(255,255,255,0.04)', title=''),
+                    yaxis=dict(gridcolor='rgba(255,255,255,0.04)', title='', autorange='reversed')
+                )
+                st.plotly_chart(fig_ips, use_container_width=True)
+
+            with types_col:
+                st.markdown('<div class="section-header"><h3>⚡ Attack Type Breakdown</h3></div>', unsafe_allow_html=True)
+                type_counts = df['attack_type'].value_counts().reset_index()
+                type_counts.columns = ['Type', 'Count']
+                type_colors = ['#34d399' if t == 'Normal Traffic' else '#f87171' for t in type_counts['Type']]
+                fig_types = go.Figure(go.Bar(
+                    x=type_counts['Count'], y=type_counts['Type'], orientation='h',
+                    marker=dict(color=type_colors, line=dict(width=0)),
+                    text=type_counts['Count'], textposition='inside'
+                ))
+                fig_types.update_layout(
+                    height=280,
+                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#94a3b8', family='Inter', size=11),
+                    margin=dict(l=120, r=20, t=10, b=30),
+                    xaxis=dict(gridcolor='rgba(255,255,255,0.04)', title=''),
+                    yaxis=dict(gridcolor='rgba(255,255,255,0.04)', title='', autorange='reversed')
+                )
+                st.plotly_chart(fig_types, use_container_width=True)
 
         # Traffic Timeline Chart
         if 'timestamp' in df.columns and len(df) > 1:
