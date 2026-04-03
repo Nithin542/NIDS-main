@@ -1,5 +1,6 @@
 import streamlit as st
 from sqlalchemy import create_engine
+from sqlalchemy.sql import text
 from dotenv import load_dotenv
 import pandas as pd
 import json
@@ -295,12 +296,26 @@ elif st.session_state.mode == 'live':
     with col_stop:
         stop_button()
 
-    c_ref1, c_ref2 = st.columns([1, 5])
+    c_ref1, c_ref2, c_ref3 = st.columns([1, 2, 3])
     with c_ref1:
         auto_refresh = st.checkbox("Auto-Refresh (5s)", value=True)
     with c_ref2:
         if st.button("Manual Refresh 🔄"):
             st.rerun()
+    with c_ref3:
+        if st.button("🗑️ Clear Traffic Logs (Reset to 0)"):
+            try:
+                db_url = os.environ.get("DATABASE_URL")
+                if not db_url: db_url = st.secrets["DATABASE_URL"]
+                if db_url.startswith("postgres://"): db_url = db_url.replace("postgres://", "postgresql://", 1)
+                engine = create_engine(db_url)
+                with engine.begin() as conn:
+                    conn.execute(text("DELETE FROM logs"))
+                st.success("✅ Database wiped clean! Ready for presentation.")
+                time.sleep(1.5)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to clear logs: {e}")
 
     df = get_live_data()
 
