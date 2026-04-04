@@ -439,7 +439,7 @@ def shap_chart(X_array, row_label=""):
             xaxis=dict(gridcolor='rgba(255,255,255,0.04)', zerolinecolor='rgba(255,255,255,0.1)'),
             yaxis=dict(gridcolor='rgba(255,255,255,0.04)')
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         return top_features[['Feature', 'SHAP', 'Raw']].to_dict('records')
 
 # ======================================================
@@ -450,7 +450,7 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 def ai_explain(attack_type, confidence, shap_data, src_ip="", dst_ip="", btn_key="ai_btn"):
-    if st.button("🤖 Generate AI Threat Intelligence Report", key=btn_key, use_container_width=True):
+    if st.button("🤖 Generate AI Threat Intelligence Report", key=btn_key, width="stretch"):
         feature_lines = "\n".join(
             f"  • {r['Feature']}: SHAP={r['SHAP']:.4f}, Scaled Value={r['Raw']:.3f}"
             for r in shap_data
@@ -595,7 +595,7 @@ Auto-refresh every 5 seconds with threat highlighting and per-flow XAI deep dive
 </div>
 """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("▶  Launch Live Monitor", use_container_width=True, key="btn_live"):
+        if st.button("▶  Launch Live Monitor", width="stretch", key="btn_live"):
             ok, err = load_model()
             if ok:
                 st.session_state.mode = 'live'
@@ -615,7 +615,7 @@ Get attack predictions, confidence scores, and granular SHAP explanations.
 </div>
 """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("▶  Open CSV Analysis", use_container_width=True, key="btn_csv"):
+        if st.button("▶  Open CSV Analysis", width="stretch", key="btn_csv"):
             ok, err = load_model()
             if ok:
                 st.session_state.mode = 'csv'
@@ -757,7 +757,7 @@ elif st.session_state.mode == 'live':
                 annotations=[dict(text=f'<b>{total_flows:,}</b><br><span style="font-size:10px;color:#64748b">Total</span>',
                                   x=0.5, y=0.5, font=dict(size=18, color='#e2e8f0'), showarrow=False)]
             )
-            st.plotly_chart(fig_donut, use_container_width=True)
+            st.plotly_chart(fig_donut, width="stretch")
 
         # ---- Top Talkers (Source IPs) ----
         if 'src_ip' in df.columns and len(df) > 0:
@@ -780,7 +780,7 @@ elif st.session_state.mode == 'live':
                     xaxis=dict(gridcolor='rgba(255,255,255,0.04)', title=''),
                     yaxis=dict(gridcolor='rgba(255,255,255,0.04)', title='', autorange='reversed')
                 )
-                st.plotly_chart(fig_ips, use_container_width=True)
+                st.plotly_chart(fig_ips, width="stretch")
 
             with types_col:
                 st.markdown('<div class="section-header"><h3>⚡ Attack Type Breakdown</h3></div>', unsafe_allow_html=True)
@@ -800,7 +800,7 @@ elif st.session_state.mode == 'live':
                     xaxis=dict(gridcolor='rgba(255,255,255,0.04)', title=''),
                     yaxis=dict(gridcolor='rgba(255,255,255,0.04)', title='', autorange='reversed')
                 )
-                st.plotly_chart(fig_types, use_container_width=True)
+                st.plotly_chart(fig_types, width="stretch")
 
         # Traffic Timeline Chart
         if 'timestamp' in df.columns and len(df) > 1:
@@ -833,7 +833,7 @@ elif st.session_state.mode == 'live':
                 margin=dict(l=50, r=20, t=20, b=40),
                 showlegend=False
             )
-            st.plotly_chart(fig_timeline, use_container_width=True)
+            st.plotly_chart(fig_timeline, width="stretch")
 
         # Traffic Table
         st.markdown('<div class="section-header"><h3>📋 Recent Traffic Stream</h3></div>', unsafe_allow_html=True)
@@ -843,7 +843,7 @@ elif st.session_state.mode == 'live':
             return ['background-color:rgba(248,113,113,0.12)']*len(row) \
                    if row['attack_type'] != 'Normal Traffic' else ['']*len(row)
 
-        st.dataframe(display_df.style.apply(hl_live, axis=1), use_container_width=True, height=320)
+        st.dataframe(display_df.style.apply(hl_live, axis=1), width="stretch", height=320)
 
         # XAI Section
         st.markdown('<div class="section-header"><h3>🧠 Explainable AI — Threat Deep Dive</h3></div>', unsafe_allow_html=True)
@@ -1013,7 +1013,7 @@ Upload a CSV of network flows to classify each row using the HybridFormer AI eng
                 xaxis=dict(gridcolor='rgba(255,255,255,0.04)'),
                 yaxis=dict(gridcolor='rgba(255,255,255,0.04)')
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             # Full table
             st.markdown('<div class="section-header"><h3>📋 Row-by-Row Predictions</h3></div>', unsafe_allow_html=True)
@@ -1030,7 +1030,7 @@ Upload a CSV of network flows to classify each row using the HybridFormer AI eng
             if len(results) > 1000:
                 st.caption(f"Showing first 1,000 of {len(results):,} rows — download the full CSV below.")
             st.dataframe(preview.style.apply(hl_csv, axis=1),
-                         use_container_width=True, height=350)
+                         width="stretch", height=350)
 
             st.download_button(
                 "⬇️ Download Full Results CSV",
