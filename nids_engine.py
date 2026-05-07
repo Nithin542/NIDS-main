@@ -101,6 +101,9 @@ MAPS = {
     'Bwd Packet Length Mean': 'dst2src_mean_ps',
     'Bwd Packet Length Std': 'dst2src_stddev_ps',
 
+    'Flow Bytes/s': 'bidirectional_bytes',
+    'Flow Packets/s': 'bidirectional_packets',
+
     'Flow IAT Mean': 'bidirectional_mean_piat_ms',
     'Flow IAT Std': 'bidirectional_stddev_piat_ms',
     'Flow IAT Max': 'bidirectional_max_piat_ms',
@@ -134,16 +137,6 @@ MAPS = {
     'Subflow Fwd Bytes': 'src2dst_bytes',
     'Init_Win_bytes_forward': 'src2dst_init_window_size',
     'Init_Win_bytes_backward': 'dst2src_init_window_size',
-
-    # Previously missing mappings
-    'act_data_pkt_fwd': 'src2dst_packets',
-    'min_seg_size_forward': 'src2dst_min_ps',
-    'Active Mean': 'bidirectional_mean_active_ms',
-    'Active Max': 'bidirectional_max_active_ms',
-    'Active Min': 'bidirectional_min_active_ms',
-    'Idle Mean': 'bidirectional_mean_idle_ms',
-    'Idle Max': 'bidirectional_max_idle_ms',
-    'Idle Min': 'bidirectional_min_idle_ms',
 }
 
 # ==============================
@@ -166,8 +159,8 @@ try:
     streamer = NFStreamer(
         source=network_interface,
         statistical_analysis=True,
-        idle_timeout=1,
-        active_timeout=1,
+        idle_timeout=10,
+        active_timeout=30,
         promiscuous_mode=True
     )
 except Exception as e:
@@ -183,52 +176,29 @@ for flow in streamer:
     try:
         features_dict = {}
 
-        # Get flow duration in seconds for rate calculations
-        duration_ms = getattr(flow, 'bidirectional_duration_ms', 0)
-        duration_s = duration_ms / 1000.0 if duration_ms > 0 else 0.001  # avoid division by zero
+        # Get duration in seconds for rate calculations
+        duration_sec = max(getattr(flow, 'bidirectional_duration_ms', 0) / 1000.0, 0.001)
 
         for col in feature_names:
             if col == 'Attack Type':
                 continue
 
-            # ---- Derived rate features (must be computed, not read directly) ----
+            attr_name = MAPS.get(col)
+            val = getattr(flow, attr_name, 0) if attr_name else 0
+
+            # Convert durations to microseconds (CIC-IDS uses microseconds)
+            if "Duration" in col or "IAT" in col:
+                val = val * 1000
+
+            # Compute RATES (not raw counts) for Bytes/s and Packets/s
             if col == 'Flow Bytes/s':
-                total_bytes = getattr(flow, 'bidirectional_bytes', 0)
-                val = total_bytes / duration_s
-                features_dict[col] = [val]
-                continue
-
-            if col == 'Flow Packets/s':
-                total_pkts = getattr(flow, 'bidirectional_packets', 0)
-                val = total_pkts / duration_s
-                features_dict[col] = [val]
-                continue
-
-            if col == 'Fwd Packets/s':
-                fwd_pkts = getattr(flow, 'src2dst_packets', 0)
-                val = fwd_pkts / duration_s
-                features_dict[col] = [val]
-                continue
-
-            if col == 'Bwd Packets/s':
-                bwd_pkts = getattr(flow, 'dst2src_packets', 0)
-                val = bwd_pkts / duration_s
-                features_dict[col] = [val]
-                continue
+                val = getattr(flow, 'bidirectional_bytes', 0) / duration_sec
+            elif col == 'Flow Packets/s':
+                val = getattr(flow, 'bidirectional_packets', 0) / duration_sec
 
             if col == 'Packet Length Variance':
                 std_val = getattr(flow, 'bidirectional_stddev_ps', 0)
                 val = std_val ** 2
-                features_dict[col] = [val]
-                continue
-
-            # ---- Standard mapped features ----
-            attr_name = MAPS.get(col)
-            val = getattr(flow, attr_name, 0) if attr_name else 0
-
-            # Convert durations to microseconds (CIC-IDS uses µs, NFStream uses ms)
-            if "Duration" in col or "IAT" in col or "Active" in col or "Idle" in col:
-                val = val * 1000
 
             features_dict[col] = [val]
 
